@@ -3,6 +3,7 @@ import type { Header } from 'vue3-easy-data-table';
 import EasyDataTable from 'vue3-easy-data-table';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import { index as staffIndex } from '@/routes/admin/staff';
 import {
     create as createBillRoute,
@@ -57,6 +58,7 @@ const props = defineProps<{
 defineOptions({ layout: AppLayout });
 
 const tableHeaders: Header[] = [
+    { text: '', value: 'select' },
     { text: 'ID', value: 'id' },
     { text: 'Ky hieu', value: 'bill_symbol' },
     { text: 'MST ben ban', value: 'bill_sell_mst' },
@@ -74,12 +76,48 @@ const search = useForm({
     page: props.bills.current_page,
 });
 
+const selectedBillIds = ref<number[]>([]);
+
+const allVisibleSelected = computed(() => {
+    if (rows.length === 0) {
+        return false;
+    }
+
+    return rows.every((row) => selectedBillIds.value.includes(row.id));
+});
+
+const toggleSelectAll = (): void => {
+    if (allVisibleSelected.value) {
+        selectedBillIds.value = [];
+
+        return;
+    }
+
+    selectedBillIds.value = rows.map((row) => row.id);
+};
+
+const toggleSelectedBill = (billId: number): void => {
+    if (selectedBillIds.value.includes(billId)) {
+        selectedBillIds.value = selectedBillIds.value.filter((id) => id !== billId);
+
+        return;
+    }
+
+    selectedBillIds.value.push(billId);
+};
+
 const destroyBill = (billId: number): void => {
     if (!confirm('Ban co chac chan muon xoa hoa don nay?')) {
         return;
     }
 
-    router.delete(destroyBillRoute(billId).url, { preserveScroll: true });
+    router.delete(destroyBillRoute(billId).url, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selectedBillIds.value = selectedBillIds.value.filter((id) => id !== billId);
+            applyFilters(props.bills.current_page);
+        },
+    });
 };
 
 const applyFilters = (page = 1): void => {
@@ -110,6 +148,32 @@ const rows = props.bills.data.map((bill) => ({
 const getPdfUrl = (billId: number): string | null => {
     return rows.find((row) => row.id === billId)?.pdf_url ?? null;
 };
+
+const destroySelectedBills = (billIds: number[], index = 0): void => {
+    if (index >= billIds.length) {
+        selectedBillIds.value = [];
+        applyFilters(props.bills.current_page);
+
+        return;
+    }
+
+    router.delete(destroyBillRoute(billIds[index]).url, {
+        preserveScroll: true,
+        onSuccess: () => destroySelectedBills(billIds, index + 1),
+    });
+};
+
+const deleteSelected = (): void => {
+    if (selectedBillIds.value.length === 0) {
+        return;
+    }
+
+    if (!confirm(`Ban co chac chan muon xoa ${selectedBillIds.value.length} hoa don da chon?`)) {
+        return;
+    }
+
+    destroySelectedBills([...selectedBillIds.value]);
+};
 </script>
 
 <template>
@@ -126,6 +190,17 @@ const getPdfUrl = (billId: number): string | null => {
 
         <div class="space-y-3 rounded-lg border p-4">
             <div class="flex flex-wrap items-center gap-2">
+                <button type="button" class="rounded border px-3 py-2 text-sm" @click="toggleSelectAll">
+                    {{ allVisibleSelected ? 'Bo chon tat ca' : 'Chon tat ca' }}
+                </button>
+                <button
+                    type="button"
+                    class="rounded border border-red-200 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+                    :disabled="selectedBillIds.length === 0"
+                    @click="deleteSelected"
+                >
+                    Xoa da chon ({{ selectedBillIds.length }})
+                </button>
                 <input
                     v-model="search.search"
                     class="rounded border px-3 py-2 text-sm"
@@ -141,6 +216,14 @@ const getPdfUrl = (billId: number): string | null => {
             </div>
 
             <EasyDataTable :headers="tableHeaders" :items="rows" hide-footer>
+                <template #item-select="{ id }">
+                    <input
+                        type="checkbox"
+                        class="h-4 w-4"
+                        :checked="selectedBillIds.includes(id)"
+                        @change="toggleSelectedBill(id)"
+                    />
+                </template>
                 <template #item-actions="{ id }">
                     <div class="flex gap-2">
                         <a
