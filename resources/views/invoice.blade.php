@@ -288,7 +288,8 @@
             <div class="pdf24_05 pdf24_06">
                 <div class="pdf24_01" style="left:26.9817em;top:1.9471em;"><span class="pdf24_07 pdf24_08 pdf24_09"
                         style="word-spacing:0em;">Ký hiệu:</span><span class="pdf24_07 pdf24_08 pdf24_09"
-                        style="word-spacing:0.9793em;">&nbsp;</span><span class="pdf24_07 pdf24_08 pdf24_09">2C26CBB
+                        style="word-spacing:0.9793em;">&nbsp;</span><span
+                        class="pdf24_07 pdf24_08 pdf24_09">{{ $bill->bill_symbol }}
                         &nbsp;</span></div>
                 <div class="pdf24_01" style="left:12.3191em;top:1.6296em;"><span class="pdf24_10 pdf24_08 pdf24_09"
                         style="word-spacing:-0.0184em;">HÓA ĐƠN BÁN HÀNG &nbsp;</span></div>
@@ -381,7 +382,8 @@
                 <div class="pdf24_01" style="left:5.3166em;top:18.4626em;"><span class="pdf24_17 pdf24_08 pdf24_09"
                         style="word-spacing:0em;">{{ $bill->items[0]->name ?: '-' }} &nbsp;</span></div>
                 <div class="pdf24_01" style="left:16.1916em;top:18.4626em;"><span
-                        class="pdf24_17 pdf24_08 pdf24_09">{{ $bill->items[0]->calculation_unit ?: '-' }} &nbsp;</span>
+                        class="pdf24_17 pdf24_08 pdf24_09">{{ $bill->items[0]->calculation_unit ?: '-' }}
+                        &nbsp;</span>
                 </div>
                 <div class="pdf24_01" style="left:20.3974em;top:18.4626em;"><span
                         class="pdf24_17 pdf24_08 pdf24_09">{{ $bill->items[0]->quantity ?: '-' }}</span></div>

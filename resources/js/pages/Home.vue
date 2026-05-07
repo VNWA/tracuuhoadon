@@ -221,7 +221,6 @@ onBeforeUnmount(() => {
                             <li class=" flex items-center gap-2">
                                 Tải chứng thư số
                             </li>
-
                         </ul>
                         <button
                             class="bg-red-600 px-2 py-1 flex items-center justify-center gap-2 text-white rounded font-bold text-lg">
