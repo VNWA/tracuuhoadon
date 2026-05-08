@@ -6,19 +6,11 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { index as staffIndex } from '@/routes/admin/staff';
 import {
-    create as createBillRoute,
     destroy as destroyBillRoute,
     edit as editBillRoute,
     index as billsIndex,
+    store as storeBillRoute,
 } from '@/routes/admin/bills';
-
-type BillItem = {
-    name: string;
-    calculation_unit: string;
-    quantity: string;
-    unit_price: string;
-    amount: string;
-};
 
 type Bill = {
     id: number;
@@ -28,17 +20,11 @@ type Bill = {
     bill_year: string | null;
     bill_sell_mst: string;
     bill_private_key: string;
-    customer_name: string | null;
-    customer_address: string | null;
-    customer_cccd_number: string | null;
-    customer_phone: string | null;
-    payment_method: string;
-    total_amount: string | null;
     pdf_url: string | null;
+    demo_download_url: string | null;
     created_at: string | null;
     updated_at: string | null;
     user: { id: number | null; name: string | null; email: string | null };
-    items: BillItem[];
 };
 
 type Paginated<T> = {
@@ -61,12 +47,12 @@ const tableHeaders: Header[] = [
     { text: '', value: 'select' },
     { text: 'ID', value: 'id' },
     { text: 'Ky hieu', value: 'bill_symbol' },
-    { text: 'MST ben ban', value: 'bill_sell_mst' },
+    { text: 'Ngay HD', value: 'invoice_date' },
+    { text: 'MST ban', value: 'bill_sell_mst' },
     { text: 'Ma bi mat', value: 'bill_private_key' },
-    { text: 'Khach hang', value: 'customer_name' },
-    { text: 'Tong tien', value: 'total_amount' },
     { text: 'Nguoi tao', value: 'creator' },
-    { text: 'Cap nhat luc', value: 'updated_at' },
+    { text: 'Trang thai PDF', value: 'pdf_status' },
+    { text: 'Cap nhat', value: 'updated_at' },
     { text: 'Tac vu', value: 'actions' },
 ];
 
@@ -77,14 +63,24 @@ const search = useForm({
 });
 
 const selectedBillIds = ref<number[]>([]);
+const creating = ref(false);
 
 const allVisibleSelected = computed(() => {
-    if (rows.length === 0) {
+    if (rows.value.length === 0) {
         return false;
     }
 
-    return rows.every((row) => selectedBillIds.value.includes(row.id));
+    return rows.value.every((row) => selectedBillIds.value.includes(row.id));
 });
+
+const rows = computed(() =>
+    props.bills.data.map((bill) => ({
+        ...bill,
+        creator: bill.user?.name ?? '-',
+        invoice_date: [bill.bill_date, bill.bill_month, bill.bill_year].filter(Boolean).join('/') || '-',
+        pdf_status: bill.pdf_url ? 'Da tai len' : 'Chua tai len',
+    })),
+);
 
 const toggleSelectAll = (): void => {
     if (allVisibleSelected.value) {
@@ -93,7 +89,7 @@ const toggleSelectAll = (): void => {
         return;
     }
 
-    selectedBillIds.value = rows.map((row) => row.id);
+    selectedBillIds.value = rows.value.map((row) => row.id);
 };
 
 const toggleSelectedBill = (billId: number): void => {
@@ -140,13 +136,8 @@ const goToPage = (page: number): void => {
     }
 };
 
-const rows = props.bills.data.map((bill) => ({
-    ...bill,
-    creator: bill.user?.name ?? '-',
-}));
-
 const getPdfUrl = (billId: number): string | null => {
-    return rows.find((row) => row.id === billId)?.pdf_url ?? null;
+    return rows.value.find((row) => row.id === billId)?.pdf_url ?? null;
 };
 
 const destroySelectedBills = (billIds: number[], index = 0): void => {
@@ -174,28 +165,65 @@ const deleteSelected = (): void => {
 
     destroySelectedBills([...selectedBillIds.value]);
 };
+
+const createBill = (): void => {
+    if (creating.value) {
+        return;
+    }
+
+    creating.value = true;
+
+    router.post(storeBillRoute().url, {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            creating.value = false;
+        },
+    });
+};
 </script>
 
 <template>
     <Head title="Admin - Quan ly hoa don" />
 
-    <div class="space-y-6 p-4">
-        <div class="flex items-center justify-between">
-            <h1 class="text-xl font-semibold">Admin / Quan ly hoa don</h1>
-            <div class="flex items-center gap-3">
-                <Link :href="createBillRoute().url" class="rounded bg-black px-4 py-2 text-sm text-white">Tao bill moi</Link>
-                <a v-if="canManageStaff" :href="staffIndex().url" class="text-sm underline">Quan ly staff</a>
+    <div class="space-y-6 p-4 md:p-8">
+        <div
+            class="flex flex-col gap-4 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div>
+                <h1 class="text-2xl font-semibold tracking-tight text-foreground">Quan ly hoa don</h1>
+                <p class="mt-1 text-sm text-muted-foreground">Tao ban mau bang mot lan bam, tai len file PDF tai trang sua.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-50"
+                    :disabled="creating"
+                    @click="createBill"
+                >
+                    {{ creating ? 'Dang tao...' : 'Tao bill moi' }}
+                </button>
+                <a
+                    v-if="canManageStaff"
+                    :href="staffIndex().url"
+                    class="inline-flex rounded-lg border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted/80"
+                >
+                    Quan ly staff
+                </a>
             </div>
         </div>
 
-        <div class="space-y-3 rounded-lg border p-4">
+        <div class="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-sm md:p-6">
             <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class="rounded border px-3 py-2 text-sm" @click="toggleSelectAll">
+                <button
+                    type="button"
+                    class="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted/60"
+                    @click="toggleSelectAll"
+                >
                     {{ allVisibleSelected ? 'Bo chon tat ca' : 'Chon tat ca' }}
                 </button>
                 <button
                     type="button"
-                    class="rounded border border-red-200 px-3 py-2 text-sm text-red-700 disabled:opacity-50"
+                    class="rounded-lg border border-destructive/30 px-3 py-2 text-sm text-destructive disabled:opacity-50"
                     :disabled="selectedBillIds.length === 0"
                     @click="deleteSelected"
                 >
@@ -203,51 +231,68 @@ const deleteSelected = (): void => {
                 </button>
                 <input
                     v-model="search.search"
-                    class="rounded border px-3 py-2 text-sm"
-                    placeholder="Tim theo MST, ma bi mat, ten khach..."
+                    class="min-w-[200px] flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="Tim theo ky hieu, MST, ma bi mat..."
                     @keyup.enter="applyFilters(1)"
                 />
-                <select v-model.number="search.per_page" class="rounded border px-3 py-2 text-sm" @change="applyFilters(1)">
+                <select v-model.number="search.per_page" class="rounded-lg border border-input bg-background px-3 py-2 text-sm" @change="applyFilters(1)">
                     <option :value="10">10 / trang</option>
                     <option :value="20">20 / trang</option>
                     <option :value="50">50 / trang</option>
                 </select>
-                <button type="button" class="rounded border px-3 py-2 text-sm" @click="applyFilters(1)">Loc</button>
+                <button type="button" class="rounded-lg bg-secondary px-3 py-2 text-sm hover:bg-secondary/80" @click="applyFilters(1)">Loc</button>
             </div>
 
-            <EasyDataTable :headers="tableHeaders" :items="rows" hide-footer>
-                <template #item-select="{ id }">
-                    <input
-                        type="checkbox"
-                        class="h-4 w-4"
-                        :checked="selectedBillIds.includes(id)"
-                        @change="toggleSelectedBill(id)"
-                    />
-                </template>
-                <template #item-actions="{ id }">
-                    <div class="flex gap-2">
-                        <a
-                            :href="getPdfUrl(id) ?? '#'"
-                            class="rounded border px-2 py-1 text-xs"
-                            :class="{ 'pointer-events-none opacity-50': !getPdfUrl(id) }"
-                            target="_blank"
-                            rel="noopener noreferrer"
+            <div class="overflow-x-auto rounded-xl border border-border">
+                <EasyDataTable class="w-full text-sm" :headers="tableHeaders" :items="rows" hide-footer>
+                    <template #item-select="{ id }">
+                        <input type="checkbox" class="size-4 rounded border-input accent-primary" :checked="selectedBillIds.includes(id)" @change="toggleSelectedBill(id)" />
+                    </template>
+                    <template #item-pdf_status="{ pdf_status }">
+                        <span
+                            class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
+                            :class="pdf_status === 'Da tai len' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'"
                         >
-                            View
-                        </a>
-                        <Link :href="editBillRoute(id).url" class="rounded border px-2 py-1 text-xs">Sua</Link>
-                        <button class="rounded border px-2 py-1 text-xs text-red-700" @click="destroyBill(id)">Xoa</button>
-                    </div>
-                </template>
-            </EasyDataTable>
+                            {{ pdf_status }}
+                        </span>
+                    </template>
+                    <template #item-actions="{ id }">
+                        <div class="flex flex-wrap gap-1.5">
+                            <a
+                                :href="getPdfUrl(id) ?? '#'"
+                                class="rounded-md border px-2 py-1 text-xs transition hover:bg-muted"
+                                :class="{ 'pointer-events-none opacity-40': !getPdfUrl(id) }"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Xem PDF
+                            </a>
+                            <Link :href="editBillRoute(id).url" class="rounded-md border border-primary/30 px-2 py-1 text-xs font-medium hover:bg-primary/10"> Sua </Link>
+                            <button class="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10" @click="destroyBill(id)">
+                                Xoa
+                            </button>
+                        </div>
+                    </template>
+                </EasyDataTable>
+            </div>
 
-            <div class="flex items-center justify-between text-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <p>Trang {{ bills.current_page }}/{{ bills.last_page }} - Tong {{ bills.total }} hoa don</p>
                 <div class="flex gap-2">
-                    <button class="rounded border px-3 py-1" :disabled="bills.current_page <= 1" @click="goToPage(bills.current_page - 1)">
+                    <button
+                        class="rounded-lg border px-3 py-1.5 hover:bg-muted disabled:opacity-40"
+                        type="button"
+                        :disabled="bills.current_page <= 1"
+                        @click="goToPage(bills.current_page - 1)"
+                    >
                         Truoc
                     </button>
-                    <button class="rounded border px-3 py-1" :disabled="bills.current_page >= bills.last_page" @click="goToPage(bills.current_page + 1)">
+                    <button
+                        class="rounded-lg border px-3 py-1.5 hover:bg-muted disabled:opacity-40"
+                        type="button"
+                        :disabled="bills.current_page >= bills.last_page"
+                        @click="goToPage(bills.current_page + 1)"
+                    >
                         Sau
                     </button>
                 </div>

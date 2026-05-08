@@ -22,18 +22,13 @@ class BillFactory extends Factory
         return [
             'user_id' => User::factory(),
             'bill_symbol' => Str::upper(fake()->unique()->bothify('#?##???')),
-            'bill_number' => fake()->unique()->numerify('########'),
+            'bill_private_key' => Str::upper(Str::random(16)),
             'bill_date' => str_pad((string) fake()->numberBetween(1, 28), 2, '0', STR_PAD_LEFT),
             'bill_month' => str_pad((string) fake()->numberBetween(1, 12), 2, '0', STR_PAD_LEFT),
             'bill_year' => (string) fake()->numberBetween(2020, 2030),
-            'bill_private_key' => Str::upper(Str::random(16)),
-            'bill_sell_mst' => '0301045759',
-            'customer_name' => fake()->name(),
-            'customer_address' => fake()->address(),
-            'customer_cccd_number' => (string) fake()->numerify('############'),
-            'customer_phone' => fake()->phoneNumber(),
-            'payment_method' => fake()->randomElement(['Tien mat', 'Chuyen khoan']),
-            'total_amount' => (string) fake()->numberBetween(100000, 9000000),
+            'bill_sell_mst' => '0301045759-022',
+            'bill_demo_path' => null,
+            'bill_path' => null,
         ];
     }
 }

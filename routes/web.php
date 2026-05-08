@@ -15,11 +15,11 @@ Route::middleware(['auth', 'verified', 'role:admin|staff'])->prefix('admin')->na
 
     Route::controller(BillController::class)->prefix('bills')->name('bills.')->group(function () {
         Route::get('/', 'index')->name('index');
-        Route::get('/create', 'create')->name('create');
-        Route::get('/{bill}/pdf', 'pdf')->name('pdf');
-        Route::get('/{bill}/edit', 'edit')->name('edit');
         Route::post('/', 'store')->name('store');
-        Route::put('/{bill}', 'update')->name('update');
+        Route::get('/{bill}/pdf', 'pdf')->name('pdf');
+        Route::get('/{bill}/demo', 'demo')->name('demo');
+        Route::post('/{bill}/upload', 'upload')->name('upload');
+        Route::get('/{bill}/edit', 'edit')->name('edit');
         Route::delete('/{bill}', 'destroy')->name('destroy');
     });
 

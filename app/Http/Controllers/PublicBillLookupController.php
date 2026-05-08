@@ -39,7 +39,7 @@ class PublicBillLookupController extends Controller
         $lookup = $request->validated();
 
         $bill = Bill::query()
-            ->with(['items', 'user'])
+            ->with(['user'])
             ->where('bill_sell_mst', $lookup['bill_sell_mst'])
             ->where('bill_private_key', $lookup['bill_private_key'])
             ->firstOrFail();
