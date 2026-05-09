@@ -15,8 +15,8 @@ class PublicBillLookupController extends Controller
         $lookup = $request->validated();
 
         $bill = Bill::query()
-            ->where('bill_sell_mst', $lookup['bill_sell_mst'])
-            ->where('bill_private_key', $lookup['bill_private_key'])
+            ->where('sell_mst', $lookup['bill_sell_mst'])
+            ->where('private_key', $lookup['bill_private_key'])
             ->first();
 
         if (! $bill) {
@@ -39,9 +39,9 @@ class PublicBillLookupController extends Controller
         $lookup = $request->validated();
 
         $bill = Bill::query()
-            ->with(['user'])
-            ->where('bill_sell_mst', $lookup['bill_sell_mst'])
-            ->where('bill_private_key', $lookup['bill_private_key'])
+            ->with(['items', 'user'])
+            ->where('sell_mst', $lookup['bill_sell_mst'])
+            ->where('private_key', $lookup['bill_private_key'])
             ->firstOrFail();
 
         return Pdf::view('invoice', ['bill' => $bill])

@@ -15,13 +15,13 @@ class PublicBillLookupTest extends TestCase
     public function test_public_lookup_returns_pdf_url_when_bill_exists(): void
     {
         $bill = Bill::factory()->create([
-            'bill_sell_mst' => '0301045759-022',
-            'bill_private_key' => 'SECRETKEY123',
+            'sell_mst' => '0301045759-022',
+            'private_key' => 'SECRETKEY123456',
         ]);
 
         $response = $this->post(route('public-bill.search'), [
-            'bill_sell_mst' => $bill->bill_sell_mst,
-            'bill_private_key' => $bill->bill_private_key,
+            'bill_sell_mst' => $bill->sell_mst,
+            'bill_private_key' => $bill->private_key,
         ]);
 
         $response->assertOk();
@@ -33,13 +33,13 @@ class PublicBillLookupTest extends TestCase
         Pdf::fake();
 
         $bill = Bill::factory()->create([
-            'bill_sell_mst' => '0301045759-022',
-            'bill_private_key' => 'SECRETKEY123',
+            'sell_mst' => '0301045759-022',
+            'private_key' => 'SECRETKEY123456',
         ]);
 
         $response = $this->get(route('public-bill.pdf', [
-            'bill_sell_mst' => $bill->bill_sell_mst,
-            'bill_private_key' => $bill->bill_private_key,
+            'bill_sell_mst' => $bill->sell_mst,
+            'bill_private_key' => $bill->private_key,
         ]));
 
         $response->assertOk();

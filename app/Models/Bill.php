@@ -6,6 +6,7 @@ use Database\Factories\BillFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Bill extends Model
 {
@@ -14,18 +15,31 @@ class Bill extends Model
 
     protected $fillable = [
         'user_id',
-        'bill_symbol',
-        'bill_private_key',
-        'bill_date',
-        'bill_month',
-        'bill_year',
-        'bill_sell_mst',
-        'bill_demo_path',
-        'bill_path',
+        'private_key',
+        'date',
+        'month',
+        'year',
+        'sell_mst',
+        'customer_name',
+        'unit_name',
+        'customer_mst',
+        'customer_address',
+        'customer_cccd',
+        'customer_phone',
+        'payment_method',
+        'note',
+        'bill_total_currency',
+        'bill_total_text',
+        'path',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(BillItem::class);
     }
 }

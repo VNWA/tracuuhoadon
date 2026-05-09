@@ -23,14 +23,14 @@ class BillManagementAuthorizationTest extends TestCase
         $staffB = User::factory()->create();
         $staffB->assignRole('staff');
 
-        $ownBill = Bill::factory()->for($staffA)->create(['bill_private_key' => 'OWNKEY']);
-        $otherBill = Bill::factory()->for($staffB)->create(['bill_private_key' => 'OTHERKEY']);
+        $ownBill = Bill::factory()->for($staffA)->create(['private_key' => 'OWNKEY16CHARS01']);
+        $otherBill = Bill::factory()->for($staffB)->create(['private_key' => 'OTHERKEY16CH02']);
 
         $response = $this->actingAs($staffA)->get(route('admin.bills.index'));
 
         $response->assertOk();
-        $response->assertSee($ownBill->bill_private_key);
-        $response->assertDontSee($otherBill->bill_private_key);
+        $response->assertSee($ownBill->private_key);
+        $response->assertDontSee($otherBill->private_key);
     }
 
     public function test_staff_cannot_delete_bill_of_other_staff(): void

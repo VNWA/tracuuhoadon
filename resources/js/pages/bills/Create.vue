@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { index as billsIndex, update as updateBillRoute } from '@/routes/admin/bills';
+import { index as billsIndex, store as storeBillRoute } from '@/routes/admin/bills';
 
 type ItemRow = {
     name: string;
@@ -11,40 +11,23 @@ type ItemRow = {
     amount: string;
 };
 
-type Bill = {
-    id: number;
-    private_key: string;
-    date: string | null;
-    month: string | null;
-    year: string | null;
-    sell_mst: string;
-    customer_name: string | null;
-    unit_name: string | null;
-    customer_mst: string | null;
-    customer_address: string | null;
-    customer_cccd: string | null;
-    customer_phone: string | null;
-    payment_method: string | null;
-    note: string | null;
-    bill_total_currency: string | null;
-    bill_total_text: string | null;
-    pdf_url: string | null;
-    items: Array<{
-        id?: number;
-        name: string | null;
-        unit: string | null;
-        quantity: string | null;
-        unit_price: string | null;
-        amount: string | null;
-    }>;
-};
-
 const props = defineProps<{
-    bill: Bill;
     sellMstDefault: string;
 }>();
 
 defineOptions({ layout: AppLayout });
+
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+const today = ((): { date: string; month: string; year: string } => {
+    const now = new Date();
+
+    return {
+        date: pad2(now.getDate()),
+        month: pad2(now.getMonth() + 1),
+        year: String(now.getFullYear()),
+    };
+})();
 
 const emptyRow = (): ItemRow => ({
     name: '',
@@ -54,84 +37,76 @@ const emptyRow = (): ItemRow => ({
     amount: '',
 });
 
-const normalizeItems = (items: Bill['items']): ItemRow[] => {
-    const mapped: ItemRow[] = items.map((i) => ({
-        name: i.name ?? '',
-        unit: i.unit ?? '',
-        quantity: i.quantity ?? '',
-        unit_price: i.unit_price ?? '',
-        amount: i.amount ?? '',
-    }));
-
-    while (mapped.length < 5) {
-        mapped.push(emptyRow());
-    }
-
-    return mapped.slice(0, 5);
-};
+/** Dong hang dau tien mac dinh — ban sua gia tri tai day */
+const defaultFirstBillItemRow = (): ItemRow => ({
+    name: 'VÀNG MIẾNG SJC 1 (Chỉ)  ',
+    unit: 'Chỉ',
+    quantity: '1',
+    unit_price: '16.870.000',
+    amount: '16.870.000',
+});
 
 const form = useForm({
-    date: props.bill.date ?? '',
-    month: props.bill.month ?? '',
-    year: props.bill.year ?? '',
-    sell_mst: props.bill.sell_mst ?? props.sellMstDefault,
-    customer_name: props.bill.customer_name ?? '',
-    unit_name: props.bill.unit_name ?? '',
-    customer_mst: props.bill.customer_mst ?? '',
-    customer_address: props.bill.customer_address ?? '',
-    customer_cccd: props.bill.customer_cccd ?? '',
-    customer_phone: props.bill.customer_phone ?? '',
-    payment_method: props.bill.payment_method ?? '',
-    note: props.bill.note ?? '',
-    bill_total_currency: props.bill.bill_total_currency ?? '',
-    bill_total_text: props.bill.bill_total_text ?? '',
-    items: normalizeItems(props.bill.items),
+    date: today.date,
+    month: today.month,
+    year: today.year,
+    sell_mst: props.sellMstDefault,
+    customer_name: 'Trần Thiện Tuấn ',
+    unit_name: '',
+    customer_mst: '',
+    customer_address: '29/71A Đoàn Thị Điểm, P1, Phú Nhuận, TP Hồ Chí Minh  ',
+    customer_cccd: '079088037381',
+    customer_phone: '0927147686',
+    payment_method: ' Chuyển khoản ',
+    note: '',
+    bill_total_currency: '16.870.000',
+    bill_total_text: '',
+    items: [defaultFirstBillItemRow(), ...Array.from({ length: 4 }, () => emptyRow())],
 });
 
 const submit = (): void => {
-    form.put(updateBillRoute(props.bill.id).url);
+    form.post(storeBillRoute().url);
 };
 </script>
 
 <template>
 
-    <Head :title="`Sua hoa don #${bill.id}`" />
+    <Head title="Tao hoa don" />
 
     <div class="mx-auto max-w-5xl space-y-8 p-4 md:p-8">
-        <div
-            class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sua hoa don</p>
-                <h1 class="mt-1 text-2xl font-semibold">#{{ bill.id }}</h1>
-                <p class="mt-2 font-mono text-sm text-muted-foreground">Ma bi mat: {{ bill.private_key }}</p>
-                <p v-if="bill.pdf_url" class="mt-3 text-sm">
-                    <a :href="bill.pdf_url ?? '#'" class="font-medium text-primary underline" target="_blank"
-                        rel="noopener noreferrer">Mo file PDF da luu</a>
-                </p>
+                <h1 class="text-2xl font-semibold tracking-tight">Tao hoa don</h1>
+                <p class="mt-1 text-sm text-muted-foreground">Nhap du lieu va luu. He thong tu sinh ma bi mat va file
+                    PDF tu ban mau invoice.</p>
             </div>
             <Link :href="billsIndex().url"
-                class="shrink-0 rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted/80"> Ve danh sach
+                class="inline-flex rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted/80"> Ve danh sach
             </Link>
         </div>
 
         <form class="space-y-8" @submit.prevent="submit">
             <section class="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Ngay thang nam</h2>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Ngay thang nam (mac dinh
+                    hom nay)</h2>
                 <div class="mt-4 grid gap-4 sm:grid-cols-3">
                     <div class="grid gap-1">
                         <label class="text-sm font-medium">Ngay</label>
                         <input v-model="form.date"
-                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            placeholder="VD: 08" />
                     </div>
                     <div class="grid gap-1">
                         <label class="text-sm font-medium">Thang</label>
                         <input v-model="form.month"
-                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            placeholder="VD: 05" />
                     </div>
                     <div class="grid gap-1">
                         <label class="text-sm font-medium">Nam</label>
                         <input v-model="form.year"
-                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                            placeholder="VD: 2026" />
                     </div>
                 </div>
             </section>
@@ -151,7 +126,7 @@ const submit = (): void => {
                             class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
                     </div>
                     <div class="grid gap-1">
-                        <label class="text-sm font-medium">Số căn cước công dân (Citizen Identification Number)</label>
+                        <label class="text-sm font-medium">Số căn cước công dân (Citizen Identification Number):</label>
                         <input v-model="form.customer_cccd"
                             class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
                     </div>
@@ -173,6 +148,8 @@ const submit = (): void => {
                             class="rounded-lg border border-input bg-background px-3 py-2 text-sm" />
                     </div>
 
+
+
                 </div>
             </section>
 
@@ -191,7 +168,7 @@ const submit = (): void => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(_, idx) in form.items" :key="idx"
+                            <tr v-for="(row, idx) in form.items" :key="idx"
                                 class="border-b border-border/60 last:border-0">
                                 <td class="px-3 py-2 text-muted-foreground">{{ idx + 1 }}</td>
                                 <td class="px-2 py-1.5">
@@ -232,7 +209,7 @@ const submit = (): void => {
                 <button type="submit"
                     class="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow disabled:opacity-50"
                     :disabled="form.processing">
-                    {{ form.processing ? 'Dang cap nhat PDF...' : 'Cap nhat & tai tao PDF' }}
+                    {{ form.processing ? 'Dang luu...' : 'Luu & tao PDF' }}
                 </button>
             </div>
         </form>

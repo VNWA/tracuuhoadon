@@ -15,14 +15,22 @@ return new class extends Migration
         Schema::create('bills', function (Blueprint $table) {
             $table->id();
             $table->foreignIdFor(User::class)->constrained()->cascadeOnDelete();
-            $table->string('bill_symbol')->unique();
-            $table->string('bill_private_key')->unique();
-            $table->string('bill_date')->nullable();
-            $table->string('bill_month')->nullable();
-            $table->string('bill_year')->nullable();
-            $table->string('bill_sell_mst')->default('0301045759-022');
-            $table->string('bill_demo_path')->nullable();
-            $table->string('bill_path')->nullable();
+            $table->string('private_key')->unique();
+            $table->string('date')->nullable();
+            $table->string('month')->nullable();
+            $table->string('year')->nullable();
+            $table->string('sell_mst')->default('0301045759-022');
+            $table->string('customer_name')->nullable();
+            $table->string('unit_name')->nullable();
+            $table->string('customer_mst')->nullable();
+            $table->string('customer_address')->nullable();
+            $table->string('customer_cccd')->nullable();
+            $table->string('customer_phone')->nullable();
+            $table->string('payment_method')->nullable();
+            $table->string('note')->nullable();
+            $table->string('bill_total_currency')->nullable();
+            $table->string('bill_total_text')->nullable();
+            $table->string('path')->nullable();
             $table->timestamps();
         });
     }

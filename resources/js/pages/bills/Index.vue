@@ -6,22 +6,21 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { index as staffIndex } from '@/routes/admin/staff';
 import {
+    create as createBillRoute,
     destroy as destroyBillRoute,
     edit as editBillRoute,
     index as billsIndex,
-    store as storeBillRoute,
 } from '@/routes/admin/bills';
 
 type Bill = {
     id: number;
-    bill_symbol: string;
-    bill_date: string | null;
-    bill_month: string | null;
-    bill_year: string | null;
-    bill_sell_mst: string;
-    bill_private_key: string;
+    private_key: string;
+    date: string | null;
+    month: string | null;
+    year: string | null;
+    sell_mst: string;
+    customer_name: string | null;
     pdf_url: string | null;
-    demo_download_url: string | null;
     created_at: string | null;
     updated_at: string | null;
     user: { id: number | null; name: string | null; email: string | null };
@@ -46,12 +45,12 @@ defineOptions({ layout: AppLayout });
 const tableHeaders: Header[] = [
     { text: '', value: 'select' },
     { text: 'ID', value: 'id' },
-    { text: 'Ky hieu', value: 'bill_symbol' },
+    { text: 'Khach hang', value: 'customer_name' },
     { text: 'Ngay HD', value: 'invoice_date' },
-    { text: 'MST ban', value: 'bill_sell_mst' },
-    { text: 'Ma bi mat', value: 'bill_private_key' },
+    { text: 'MST ban', value: 'sell_mst' },
+    { text: 'Ma bi mat', value: 'private_key' },
     { text: 'Nguoi tao', value: 'creator' },
-    { text: 'Trang thai PDF', value: 'pdf_status' },
+    { text: 'PDF', value: 'pdf_status' },
     { text: 'Cap nhat', value: 'updated_at' },
     { text: 'Tac vu', value: 'actions' },
 ];
@@ -63,7 +62,6 @@ const search = useForm({
 });
 
 const selectedBillIds = ref<number[]>([]);
-const creating = ref(false);
 
 const allVisibleSelected = computed(() => {
     if (rows.value.length === 0) {
@@ -76,9 +74,10 @@ const allVisibleSelected = computed(() => {
 const rows = computed(() =>
     props.bills.data.map((bill) => ({
         ...bill,
+        customer_name: bill.customer_name?.trim() || '-',
         creator: bill.user?.name ?? '-',
-        invoice_date: [bill.bill_date, bill.bill_month, bill.bill_year].filter(Boolean).join('/') || '-',
-        pdf_status: bill.pdf_url ? 'Da tai len' : 'Chua tai len',
+        invoice_date: [bill.date, bill.month, bill.year].filter(Boolean).join('/') || '-',
+        pdf_status: bill.pdf_url ? 'Da co PDF' : 'Chua co',
     })),
 );
 
@@ -165,21 +164,6 @@ const deleteSelected = (): void => {
 
     destroySelectedBills([...selectedBillIds.value]);
 };
-
-const createBill = (): void => {
-    if (creating.value) {
-        return;
-    }
-
-    creating.value = true;
-
-    router.post(storeBillRoute().url, {}, {
-        preserveScroll: true,
-        onFinish: () => {
-            creating.value = false;
-        },
-    });
-};
 </script>
 
 <template>
@@ -191,17 +175,15 @@ const createBill = (): void => {
         >
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight text-foreground">Quan ly hoa don</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Tao ban mau bang mot lan bam, tai len file PDF tai trang sua.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Tao moi co form day du; sau khi luu he thong tao PDF va luu duong dan file.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-50"
-                    :disabled="creating"
-                    @click="createBill"
+                <Link
+                    :href="createBillRoute().url"
+                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:opacity-90"
                 >
-                    {{ creating ? 'Dang tao...' : 'Tao bill moi' }}
-                </button>
+                    Tao hoa don
+                </Link>
                 <a
                     v-if="canManageStaff"
                     :href="staffIndex().url"
@@ -232,7 +214,7 @@ const createBill = (): void => {
                 <input
                     v-model="search.search"
                     class="min-w-[200px] flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="Tim theo ky hieu, MST, ma bi mat..."
+                    placeholder="Tim theo ma bi mat, MST, ten khach..."
                     @keyup.enter="applyFilters(1)"
                 />
                 <select v-model.number="search.per_page" class="rounded-lg border border-input bg-background px-3 py-2 text-sm" @change="applyFilters(1)">
@@ -251,7 +233,7 @@ const createBill = (): void => {
                     <template #item-pdf_status="{ pdf_status }">
                         <span
                             class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium"
-                            :class="pdf_status === 'Da tai len' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'"
+                            :class="pdf_status === 'Da co PDF' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/15 text-amber-800 dark:text-amber-300'"
                         >
                             {{ pdf_status }}
                         </span>

@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\BillUploadRequest;
+use App\Http\Requests\BillStoreRequest;
+use App\Http\Requests\BillUpdateRequest;
 use App\Models\Bill;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,48 +18,50 @@ class BillController extends Controller
 {
     private const PDF_DIRECTORY = 'files';
 
-    private function generateBillSymbol(): string
+    private function generatePrivateKey(): string
     {
         do {
-            $symbol = random_int(1, 9)
-                .Str::upper(Str::random(1))
-                .str_pad((string) random_int(0, 99), 2, '0', STR_PAD_LEFT)
-                .Str::upper(Str::random(3));
-        } while (Bill::query()->where('bill_symbol', $symbol)->exists());
+            $key = Str::upper(Str::random(16));
+        } while (Bill::query()->where('private_key', $key)->exists());
 
-        return $symbol;
+        return $key;
     }
 
-    private function persistDemoPdf(Bill $bill): string
+    private function persistInvoicePdf(Bill $bill): void
     {
-        $bill->loadMissing(['user']);
+        $bill->loadMissing(['items', 'user']);
         Storage::disk('public')->makeDirectory(self::PDF_DIRECTORY);
 
-        $fileName = 'demo-'.Str::lower(Str::ulid()).'.pdf';
+        $oldPath = $bill->path;
+        $fileName = Str::lower(Str::ulid()).'.pdf';
         $relativePath = self::PDF_DIRECTORY.'/'.$fileName;
 
         Pdf::view('invoice', ['bill' => $bill])->disk('public')->save($relativePath);
 
-        return $relativePath;
+        $bill->update(['path' => $relativePath]);
+
+        if ($oldPath && $oldPath !== $relativePath && Storage::disk('public')->exists($oldPath)) {
+            Storage::disk('public')->delete($oldPath);
+        }
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function mapBill(Bill $bill): array
+    private function mapBillForList(Bill $bill): array
     {
+        $bill->loadMissing(['user']);
+
         return [
             'id' => $bill->id,
-            'bill_symbol' => $bill->bill_symbol,
-            'bill_date' => $bill->bill_date,
-            'bill_month' => $bill->bill_month,
-            'bill_year' => $bill->bill_year,
-            'bill_sell_mst' => $bill->bill_sell_mst,
-            'bill_private_key' => $bill->bill_private_key,
-            'bill_path' => $bill->bill_path,
-            'bill_demo_path' => $bill->bill_demo_path,
-            'demo_download_url' => $bill->bill_demo_path ? route('admin.bills.demo', $bill) : null,
-            'pdf_url' => $bill->bill_path ? route('admin.bills.pdf', $bill) : null,
+            'private_key' => $bill->private_key,
+            'date' => $bill->date,
+            'month' => $bill->month,
+            'year' => $bill->year,
+            'sell_mst' => $bill->sell_mst,
+            'customer_name' => $bill->customer_name,
+            'path' => $bill->path,
+            'pdf_url' => $bill->path ? route('admin.bills.pdf', $bill) : null,
             'created_at' => $bill->created_at?->toDateTimeString(),
             'updated_at' => $bill->updated_at?->toDateTimeString(),
             'user' => [
@@ -67,6 +70,63 @@ class BillController extends Controller
                 'email' => $bill->user?->email,
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapBill(Bill $bill): array
+    {
+        $bill->loadMissing(['items', 'user']);
+
+        return [
+            'id' => $bill->id,
+            'private_key' => $bill->private_key,
+            'date' => $bill->date,
+            'month' => $bill->month,
+            'year' => $bill->year,
+            'sell_mst' => $bill->sell_mst,
+            'customer_name' => $bill->customer_name,
+            'unit_name' => $bill->unit_name,
+            'customer_mst' => $bill->customer_mst,
+            'customer_address' => $bill->customer_address,
+            'customer_cccd' => $bill->customer_cccd,
+            'customer_phone' => $bill->customer_phone,
+            'payment_method' => $bill->payment_method,
+            'note' => $bill->note,
+            'bill_total_currency' => $bill->bill_total_currency,
+            'bill_total_text' => $bill->bill_total_text,
+            'path' => $bill->path,
+            'pdf_url' => $bill->path ? route('admin.bills.pdf', $bill) : null,
+            'created_at' => $bill->created_at?->toDateTimeString(),
+            'updated_at' => $bill->updated_at?->toDateTimeString(),
+            'user' => [
+                'id' => $bill->user?->id,
+                'name' => $bill->user?->name,
+                'email' => $bill->user?->email,
+            ],
+            'items' => $bill->items->map(fn ($item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'unit' => $item->unit,
+                'quantity' => $item->quantity,
+                'unit_price' => $item->unit_price,
+                'amount' => $item->amount,
+            ])->values(),
+        ];
+    }
+
+    private function mapBillRowsForItems(array $items): array
+    {
+        return collect($items)
+            ->map(fn (array $row) => [
+                'name' => $row['name'] ?? null,
+                'unit' => $row['unit'] ?? null,
+                'quantity' => $row['quantity'] ?? null,
+                'unit_price' => $row['unit_price'] ?? null,
+                'amount' => $row['amount'] ?? null,
+            ])
+            ->all();
     }
 
     public function index(Request $request): Response
@@ -81,9 +141,9 @@ class BillController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($builder) use ($search) {
                     $builder
-                        ->where('bill_symbol', 'like', "%{$search}%")
-                        ->orWhere('bill_sell_mst', 'like', "%{$search}%")
-                        ->orWhere('bill_private_key', 'like', "%{$search}%");
+                        ->where('private_key', 'like', "%{$search}%")
+                        ->orWhere('sell_mst', 'like', "%{$search}%")
+                        ->orWhere('customer_name', 'like', "%{$search}%");
                 });
             });
 
@@ -94,7 +154,7 @@ class BillController extends Controller
         $bills = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('bills/Index', [
-            'bills' => $bills->through(fn (Bill $bill) => $this->mapBill($bill)),
+            'bills' => $bills->through(fn (Bill $bill) => $this->mapBillForList($bill)),
             'filters' => [
                 'search' => $search,
                 'perPage' => $perPage,
@@ -103,22 +163,31 @@ class BillController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function create(): Response
     {
         $this->authorize('create', Bill::class);
 
-        $now = now();
+        return Inertia::render('bills/Create', [
+            'sellMstDefault' => '0301045759',
+        ]);
+    }
+
+    public function store(BillStoreRequest $request): RedirectResponse
+    {
+        $this->authorize('create', Bill::class);
+
+        $payload = $request->validated();
+        $items = $payload['items'];
+        unset($payload['items']);
 
         $bill = $request->user()->bills()->create([
-            'bill_symbol' => $this->generateBillSymbol(),
-            'bill_private_key' => Str::upper(Str::random(16)),
-            'bill_date' => $now->format('d'),
-            'bill_month' => $now->format('m'),
-            'bill_year' => $now->format('Y'),
+            ...$payload,
+            'private_key' => $this->generatePrivateKey(),
         ]);
 
-        $demoPath = $this->persistDemoPdf($bill->fresh());
-        $bill->update(['bill_demo_path' => $demoPath]);
+        $bill->items()->createMany($this->mapBillRowsForItems($items));
+
+        $this->persistInvoicePdf($bill->fresh(['items', 'user']));
 
         return to_route('admin.bills.edit', $bill);
     }
@@ -127,25 +196,11 @@ class BillController extends Controller
     {
         $this->authorize('view', $bill);
 
-        if (! $bill->bill_path || ! Storage::disk('public')->exists($bill->bill_path)) {
+        if (! $bill->path || ! Storage::disk('public')->exists($bill->path)) {
             abort(404, 'Khong tim thay file PDF cua hoa don.');
         }
 
-        return response()->file(Storage::disk('public')->path($bill->bill_path));
-    }
-
-    public function demo(Bill $bill): BinaryFileResponse
-    {
-        $this->authorize('view', $bill);
-
-        if (! $bill->bill_demo_path || ! Storage::disk('public')->exists($bill->bill_demo_path)) {
-            abort(404, 'Khong tim thay file ban mau.');
-        }
-
-        return response()->download(
-            Storage::disk('public')->path($bill->bill_demo_path),
-            'ban-mau-hoa-don-'.$bill->bill_private_key.'.pdf'
-        );
+        return response()->file(Storage::disk('public')->path($bill->path));
     }
 
     public function show(Bill $bill): RedirectResponse
@@ -156,26 +211,27 @@ class BillController extends Controller
     public function edit(Bill $bill): Response
     {
         $this->authorize('update', $bill);
-        $bill->loadMissing(['user']);
+        $bill->loadMissing(['user', 'items']);
 
         return Inertia::render('bills/Edit', [
             'bill' => $this->mapBill($bill),
+            'sellMstDefault' => '0301045759',
         ]);
     }
 
-    public function upload(BillUploadRequest $request, Bill $bill): RedirectResponse
+    public function update(BillUpdateRequest $request, Bill $bill): RedirectResponse
     {
         $this->authorize('update', $bill);
 
-        Storage::disk('public')->makeDirectory(self::PDF_DIRECTORY);
+        $payload = $request->validated();
+        $items = $payload['items'];
+        unset($payload['items']);
 
-        $path = $request->file('bill_file')->store(self::PDF_DIRECTORY, 'public');
-        $oldPath = $bill->bill_path;
-        $bill->update(['bill_path' => $path]);
+        $bill->update($payload);
+        $bill->items()->delete();
+        $bill->items()->createMany($this->mapBillRowsForItems($items));
 
-        if ($oldPath && $oldPath !== $path && Storage::disk('public')->exists($oldPath)) {
-            Storage::disk('public')->delete($oldPath);
-        }
+        $this->persistInvoicePdf($bill->fresh(['items', 'user']));
 
         return redirect()->back();
     }
@@ -184,11 +240,8 @@ class BillController extends Controller
     {
         $this->authorize('delete', $bill);
 
-        foreach (['bill_path', 'bill_demo_path'] as $column) {
-            $path = $bill->{$column};
-            if ($path && Storage::disk('public')->exists($path)) {
-                Storage::disk('public')->delete($path);
-            }
+        if ($bill->path && Storage::disk('public')->exists($bill->path)) {
+            Storage::disk('public')->delete($bill->path);
         }
 
         $bill->delete();
