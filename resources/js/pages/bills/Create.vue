@@ -2,6 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { index as billsIndex, store as storeBillRoute } from '@/routes/admin/bills';
+import { watch } from 'vue';
 
 type ItemRow = {
     name: string;
@@ -46,6 +47,43 @@ const defaultFirstBillItemRow = (): ItemRow => ({
     amount: '16.870.000',
 });
 
+const normalizeToString = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    return String(value);
+};
+
+const onlyDigits = (value: string | number | null | undefined): string => normalizeToString(value).replace(/\D/g, '');
+
+const formatCurrencyWithDots = (value: string): string => {
+    const digits = onlyDigits(value);
+
+    if (!digits) {
+        return '';
+    }
+
+    return Number(digits).toLocaleString('vi-VN');
+};
+
+const parseCurrencyNumber = (value: string): number => {
+    const digits = onlyDigits(value);
+
+    return digits ? Number(digits) : 0;
+};
+
+const parseQuantityNumber = (value: string | number | null | undefined): number => {
+    const normalized = normalizeToString(value).replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const calculateLineAmount = (quantity: string, unitPrice: string): number => {
+    return parseQuantityNumber(quantity) * parseCurrencyNumber(unitPrice);
+};
+
 const form = useForm({
     date: today.date,
     month: today.month,
@@ -63,6 +101,24 @@ const form = useForm({
     bill_total_text: '',
     items: [defaultFirstBillItemRow(), ...Array.from({ length: 4 }, () => emptyRow())],
 });
+
+const formatItemUnitPrice = (index: number): void => {
+    form.items[index].unit_price = formatCurrencyWithDots(form.items[index].unit_price);
+};
+
+watch(
+    () => form.items.map((item) => `${item.quantity}|${item.unit_price}`),
+    () => {
+        form.items.forEach((item) => {
+            const lineAmount = calculateLineAmount(item.quantity, item.unit_price);
+            item.amount = lineAmount > 0 ? lineAmount.toLocaleString('vi-VN') : '';
+        });
+
+        const total = form.items.reduce((sum, item) => sum + calculateLineAmount(item.quantity, item.unit_price), 0);
+        form.bill_total_currency = total > 0 ? total.toLocaleString('vi-VN') : '';
+    },
+    { immediate: true },
+);
 
 const submit = (): void => {
     form.post(storeBillRoute().url);
@@ -115,11 +171,6 @@ const submit = (): void => {
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Thong tin hoa don & ban
                     hang</h2>
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div class="grid gap-1 md:col-span-2">
-                        <label class="text-sm font-medium">MST ben ban</label>
-                        <input v-model="form.sell_mst"
-                            class="rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono" />
-                    </div>
                     <div class="grid gap-1">
                         <label class="text-sm font-medium">Họ tên người mua hàng (Customer’s name)</label>
                         <input v-model="form.customer_name"
@@ -181,15 +232,21 @@ const submit = (): void => {
                                 </td>
                                 <td class="px-2 py-1.5">
                                     <input v-model="form.items[idx].quantity"
+                                        type="number"
+                                        min="0"
+                                        step="any"
                                         class="w-full rounded border border-input bg-background px-2 py-1.5" />
                                 </td>
                                 <td class="px-2 py-1.5">
                                     <input v-model="form.items[idx].unit_price"
-                                        class="w-full rounded border border-input bg-background px-2 py-1.5" />
+                                        inputmode="numeric"
+                                        class="w-full rounded border border-input bg-background px-2 py-1.5"
+                                        @input="formatItemUnitPrice(idx)" />
                                 </td>
                                 <td class="px-2 py-1.5">
                                     <input v-model="form.items[idx].amount"
-                                        class="w-full rounded border border-input bg-background px-2 py-1.5" />
+                                        class="w-full rounded border border-input bg-muted/50 px-2 py-1.5"
+                                        readonly />
                                 </td>
                             </tr>
                         </tbody>
@@ -200,8 +257,9 @@ const submit = (): void => {
             <div class="grid gap-1">
                 <label class="text-sm font-medium">Tổng tiền thanh toán (Total payment): </label>
                 <input v-model="form.bill_total_currency"
-                    class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="VD: 1.000.000" />
+                    class="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm"
+                    placeholder="Tu dong tinh"
+                    readonly />
             </div>
             <div class="flex flex-wrap justify-end gap-2">
                 <Link :href="billsIndex().url"

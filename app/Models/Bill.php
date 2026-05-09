@@ -30,7 +30,8 @@ class Bill extends Model
         'note',
         'bill_total_currency',
         'bill_total_text',
-        'path',
+        'pdf_path',
+        'image_path',
     ];
 
     public function user(): BelongsTo

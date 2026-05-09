@@ -2,6 +2,7 @@
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { index as billsIndex, update as updateBillRoute } from '@/routes/admin/bills';
+import { watch } from 'vue';
 
 type ItemRow = {
     name: string;
@@ -29,6 +30,7 @@ type Bill = {
     bill_total_currency: string | null;
     bill_total_text: string | null;
     pdf_url: string | null;
+    jpg_url: string | null;
     items: Array<{
         id?: number;
         name: string | null;
@@ -70,6 +72,43 @@ const normalizeItems = (items: Bill['items']): ItemRow[] => {
     return mapped.slice(0, 5);
 };
 
+const normalizeToString = (value: string | number | null | undefined): string => {
+    if (value === null || value === undefined) {
+        return '';
+    }
+
+    return String(value);
+};
+
+const onlyDigits = (value: string | number | null | undefined): string => normalizeToString(value).replace(/\D/g, '');
+
+const formatCurrencyWithDots = (value: string | number | null | undefined): string => {
+    const digits = onlyDigits(value);
+
+    if (!digits) {
+        return '';
+    }
+
+    return Number(digits).toLocaleString('vi-VN');
+};
+
+const parseCurrencyNumber = (value: string | number | null | undefined): number => {
+    const digits = onlyDigits(value);
+
+    return digits ? Number(digits) : 0;
+};
+
+const parseQuantityNumber = (value: string | number | null | undefined): number => {
+    const normalized = normalizeToString(value).replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const calculateLineAmount = (quantity: string, unitPrice: string): number => {
+    return parseQuantityNumber(quantity) * parseCurrencyNumber(unitPrice);
+};
+
 const form = useForm({
     date: props.bill.date ?? '',
     month: props.bill.month ?? '',
@@ -87,6 +126,24 @@ const form = useForm({
     bill_total_text: props.bill.bill_total_text ?? '',
     items: normalizeItems(props.bill.items),
 });
+
+const formatItemUnitPrice = (index: number): void => {
+    form.items[index].unit_price = formatCurrencyWithDots(form.items[index].unit_price);
+};
+
+watch(
+    () => form.items.map((item) => `${item.quantity}|${item.unit_price}`),
+    () => {
+        form.items.forEach((item) => {
+            const lineAmount = calculateLineAmount(item.quantity, item.unit_price);
+            item.amount = lineAmount > 0 ? lineAmount.toLocaleString('vi-VN') : '';
+        });
+
+        const total = form.items.reduce((sum, item) => sum + calculateLineAmount(item.quantity, item.unit_price), 0);
+        form.bill_total_currency = total > 0 ? total.toLocaleString('vi-VN') : '';
+    },
+    { immediate: true },
+);
 
 const submit = (): void => {
     form.put(updateBillRoute(props.bill.id).url);
@@ -107,6 +164,10 @@ const submit = (): void => {
                 <p v-if="bill.pdf_url" class="mt-3 text-sm">
                     <a :href="bill.pdf_url ?? '#'" class="font-medium text-primary underline" target="_blank"
                         rel="noopener noreferrer">Mo file PDF da luu</a>
+                </p>
+                <p v-if="bill.jpg_url" class="mt-1 text-sm">
+                    <a :href="bill.jpg_url ?? '#'" class="font-medium text-primary underline" target="_blank"
+                        rel="noopener noreferrer">Xem ban anh JPG</a>
                 </p>
             </div>
             <Link :href="billsIndex().url"
@@ -203,16 +264,17 @@ const submit = (): void => {
                                         class="w-full rounded border border-input bg-background px-2 py-1.5" />
                                 </td>
                                 <td class="px-2 py-1.5">
-                                    <input v-model="form.items[idx].quantity"
+                                    <input v-model="form.items[idx].quantity" type="number" min="0" step="any"
                                         class="w-full rounded border border-input bg-background px-2 py-1.5" />
                                 </td>
                                 <td class="px-2 py-1.5">
-                                    <input v-model="form.items[idx].unit_price"
-                                        class="w-full rounded border border-input bg-background px-2 py-1.5" />
+                                    <input v-model="form.items[idx].unit_price" inputmode="numeric"
+                                        class="w-full rounded border border-input bg-background px-2 py-1.5"
+                                        @input="formatItemUnitPrice(idx)" />
                                 </td>
                                 <td class="px-2 py-1.5">
                                     <input v-model="form.items[idx].amount"
-                                        class="w-full rounded border border-input bg-background px-2 py-1.5" />
+                                        class="w-full rounded border border-input bg-muted/50 px-2 py-1.5" readonly />
                                 </td>
                             </tr>
                         </tbody>
@@ -223,8 +285,8 @@ const submit = (): void => {
             <div class="grid gap-1">
                 <label class="text-sm font-medium">Tổng tiền thanh toán (Total payment): </label>
                 <input v-model="form.bill_total_currency"
-                    class="rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="VD: 1.000.000" />
+                    class="rounded-lg border border-input bg-muted/50 px-3 py-2 text-sm" placeholder="Tu dong tinh"
+                    readonly />
             </div>
             <div class="flex flex-wrap justify-end gap-2">
                 <Link :href="billsIndex().url"

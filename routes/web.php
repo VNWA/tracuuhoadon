@@ -18,6 +18,7 @@ Route::middleware(['auth', 'verified', 'role:admin|staff'])->prefix('admin')->na
         Route::get('/create', 'create')->name('create');
         Route::post('/', 'store')->name('store');
         Route::get('/{bill}/pdf', 'pdf')->name('pdf');
+        Route::get('/{bill}/image', 'image')->name('image');
         Route::get('/{bill}/edit', 'edit')->name('edit');
         Route::put('/{bill}', 'update')->name('update');
         Route::delete('/{bill}', 'destroy')->name('destroy');

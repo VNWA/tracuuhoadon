@@ -21,6 +21,7 @@ type Bill = {
     sell_mst: string;
     customer_name: string | null;
     pdf_url: string | null;
+    jpg_url: string | null;
     created_at: string | null;
     updated_at: string | null;
     user: { id: number | null; name: string | null; email: string | null };
@@ -139,6 +140,10 @@ const getPdfUrl = (billId: number): string | null => {
     return rows.value.find((row) => row.id === billId)?.pdf_url ?? null;
 };
 
+const getJpgUrl = (billId: number): string | null => {
+    return rows.value.find((row) => row.id === billId)?.jpg_url ?? null;
+};
+
 const destroySelectedBills = (billIds: number[], index = 0): void => {
     if (index >= billIds.length) {
         selectedBillIds.value = [];
@@ -248,6 +253,15 @@ const deleteSelected = (): void => {
                                 rel="noopener noreferrer"
                             >
                                 Xem PDF
+                            </a>
+                            <a
+                                :href="getJpgUrl(id) ?? '#'"
+                                class="rounded-md border px-2 py-1 text-xs transition hover:bg-muted"
+                                :class="{ 'pointer-events-none opacity-40': !getJpgUrl(id) }"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Xem JPG
                             </a>
                             <Link :href="editBillRoute(id).url" class="rounded-md border border-primary/30 px-2 py-1 text-xs font-medium hover:bg-primary/10"> Sua </Link>
                             <button class="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10" @click="destroyBill(id)">

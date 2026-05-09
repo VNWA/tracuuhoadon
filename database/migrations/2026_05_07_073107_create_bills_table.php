@@ -30,7 +30,8 @@ return new class extends Migration
             $table->string('note')->nullable();
             $table->string('bill_total_currency')->nullable();
             $table->string('bill_total_text')->nullable();
-            $table->string('path')->nullable();
+            $table->string('pdf_path')->nullable();
+            $table->string('image_path')->nullable();
             $table->timestamps();
         });
     }

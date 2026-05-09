@@ -36,7 +36,8 @@ class BillFactory extends Factory
             'note' => null,
             'bill_total_currency' => null,
             'bill_total_text' => null,
-            'path' => null,
+            'pdf_path' => null,
+            'image_path' => null,
         ];
     }
 }

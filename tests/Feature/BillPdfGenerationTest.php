@@ -90,13 +90,16 @@ class BillPdfGenerationTest extends TestCase
         $response->assertRedirect(route('admin.bills.edit', $bill));
 
         $this->assertNotEmpty($bill->private_key);
-        $this->assertNotNull($bill->path);
-        $this->assertStringStartsWith('files/', (string) $bill->path);
-        $this->assertStringEndsWith('.pdf', (string) $bill->path);
+        $this->assertNotNull($bill->pdf_path);
+        $this->assertStringStartsWith('files/', (string) $bill->pdf_path);
+        $this->assertStringEndsWith('.pdf', (string) $bill->pdf_path);
+        $this->assertNotNull($bill->image_path);
+        $this->assertStringStartsWith('files/images/', (string) $bill->image_path);
+        $this->assertStringEndsWith('.jpg', (string) $bill->image_path);
         $this->assertCount(5, $bill->items);
 
         Pdf::assertSaved(function (PdfBuilder $pdf, string $path) use ($bill): bool {
-            return str_contains($path, (string) $bill->path);
+            return str_contains($path, (string) $bill->pdf_path);
         });
     }
 }
