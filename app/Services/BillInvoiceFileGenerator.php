@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 class BillInvoiceFileGenerator
@@ -86,10 +87,7 @@ class BillInvoiceFileGenerator
             $this->convertPdfToJpeg($bill, $absolutePath);
         } catch (\Throwable $exception) {
             try {
-                Browsershot::html(view('invoice', ['bill' => $bill])->render())
-                    ->setScreenshotType('jpeg', 95)
-                    ->windowSize(1240, 1754)
-                    ->save($absolutePath);
+                $this->renderInvoiceHtmlToJpegWithBrowsershot($bill, $absolutePath);
             } catch (\Throwable $fallbackException) {
                 Log::warning('Cannot generate bill JPEG preview.', [
                     'bill_id' => $bill->id,
@@ -102,6 +100,46 @@ class BillInvoiceFileGenerator
         return $relativePath;
     }
 
+    /**
+     * Chromium on typical Linux servers cannot use the SUID sandbox; Poppler avoids Node entirely.
+     */
+    private function renderInvoiceHtmlToJpegWithBrowsershot(Bill $bill, string $absolutePath): void
+    {
+        $browsershot = Browsershot::html(view('invoice', ['bill' => $bill])->render())
+            ->setScreenshotType('jpeg', 95)
+            ->windowSize(1240, 1754)
+            ->timeout((int) config('services.bill_invoice.browsershot_timeout', 120));
+
+        if (config('services.bill_invoice.browsershot_disable_sandbox', true)) {
+            $browsershot->noSandbox();
+            $browsershot->addChromiumArguments([
+                'disable-setuid-sandbox',
+                'disable-dev-shm-usage',
+                'disable-gpu',
+            ]);
+        }
+
+        $browsershot->save($absolutePath);
+    }
+
+    private function resolvePdftoppmBinary(): string
+    {
+        $configured = config('services.bill_invoice.pdftoppm_binary');
+
+        if (is_string($configured) && $configured !== '' && str_starts_with($configured, '/') && is_executable($configured)) {
+            return $configured;
+        }
+
+        $found = (new ExecutableFinder)->find('pdftoppm', null, [
+            '/usr/bin',
+            '/usr/local/bin',
+            '/bin',
+            '/snap/bin',
+        ]);
+
+        return $found ?? 'pdftoppm';
+    }
+
     private function convertPdfToJpeg(Bill $bill, string $targetPath): void
     {
         if (! $bill->pdf_path || ! Storage::disk('public')->exists($bill->pdf_path)) {
@@ -110,9 +148,10 @@ class BillInvoiceFileGenerator
 
         $pdfPath = Storage::disk('public')->path($bill->pdf_path);
         $targetBasePath = substr($targetPath, 0, -4);
+        $pdftoppm = $this->resolvePdftoppmBinary();
 
         $process = new Process([
-            'pdftoppm',
+            $pdftoppm,
             '-jpeg',
             '-singlefile',
             '-f',

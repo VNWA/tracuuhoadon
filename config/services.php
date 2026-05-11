@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Bill invoice PDF → JPEG (Poppler + Browsershot fallback)
+    |--------------------------------------------------------------------------
+    |
+    | Production: install Poppler (`pdftoppm`), e.g. apt install poppler-utils.
+    | Browsershot/Chromium on Linux often needs sandbox disabled inside workers.
+    |
+    */
+    'bill_invoice' => [
+        'pdftoppm_binary' => env('BILL_PDFTOPPM_BINARY'),
+        'browsershot_disable_sandbox' => env('BILL_BROWSERSHOT_NO_SANDBOX', true),
+        'browsershot_timeout' => (int) env('BILL_BROWSERSHOT_TIMEOUT', 120),
+    ],
+
 ];

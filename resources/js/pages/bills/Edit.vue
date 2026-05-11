@@ -176,8 +176,7 @@ const submit = (): void => {
     <div class="mx-auto max-w-5xl space-y-8 p-4 md:p-8">
         <div v-if="invoiceGenerationQueued"
             class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-50">
-            Da xep hang tao lai file PDF va anh JPG. Neu ban dung hang doi (database/redis), hay chay worker
-            <code class="rounded bg-background/80 px-1 py-0.5 font-mono text-xs">php artisan queue:work</code>.
+            Da xep hang tao lai file PDF va anh JPG.
             Khi xu ly xong, lam moi trang de thay lien ket tai lieu.
         </div>
         <div
