@@ -37,6 +37,9 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
+            'flash' => [
+                'invoice_generation_queued' => (bool) $request->session()->pull('invoice_generation_queued', false),
+            ],
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user()

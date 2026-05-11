@@ -11,6 +11,34 @@ class BillStoreRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        /** @var mixed $rawItems */
+        $rawItems = $this->input('items');
+
+        if (! is_array($rawItems)) {
+            return;
+        }
+
+        $items = [];
+
+        foreach ($rawItems as $item) {
+            if (! is_array($item)) {
+                $items[] = $item;
+
+                continue;
+            }
+
+            if (array_key_exists('quantity', $item) && $item['quantity'] !== null && $item['quantity'] !== '' && is_numeric($item['quantity'])) {
+                $item['quantity'] = (string) $item['quantity'];
+            }
+
+            $items[] = $item;
+        }
+
+        $this->merge(['items' => $items]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -31,7 +59,7 @@ class BillStoreRequest extends FormRequest
             'note' => ['nullable', 'string', 'max:1000'],
             'bill_total_currency' => ['nullable', 'string', 'max:100'],
             'bill_total_text' => ['nullable', 'string', 'max:500'],
-            'items' => ['required', 'array', 'size:5'],
+            'items' => ['required', 'array', 'min:1', 'max:5'],
             'items.*.name' => ['nullable', 'string', 'max:255'],
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.quantity' => ['nullable', 'string', 'max:50'],

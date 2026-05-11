@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { index as billsIndex, update as updateBillRoute } from '@/routes/admin/bills';
-import { watch } from 'vue';
+import { computed, watch } from 'vue';
 
 type ItemRow = {
     name: string;
     unit: string;
-    quantity: string;
+    quantity: string | number;
     unit_price: string;
     amount: string;
 };
@@ -48,6 +48,9 @@ const props = defineProps<{
 
 defineOptions({ layout: AppLayout });
 
+const page = usePage();
+const invoiceGenerationQueued = computed(() => page.props.flash?.invoice_generation_queued === true);
+
 const emptyRow = (): ItemRow => ({
     name: '',
     unit: '',
@@ -56,20 +59,36 @@ const emptyRow = (): ItemRow => ({
     amount: '',
 });
 
+const MAX_ITEM_ROWS = 5;
+
 const normalizeItems = (items: Bill['items']): ItemRow[] => {
-    const mapped: ItemRow[] = items.map((i) => ({
+    if (!items.length) {
+        return [emptyRow()];
+    }
+
+    return items.map((i) => ({
         name: i.name ?? '',
         unit: i.unit ?? '',
         quantity: i.quantity ?? '',
         unit_price: i.unit_price ?? '',
         amount: i.amount ?? '',
     }));
+};
 
-    while (mapped.length < 5) {
-        mapped.push(emptyRow());
+const addItemRow = (): void => {
+    if (form.items.length >= MAX_ITEM_ROWS) {
+        return;
     }
 
-    return mapped.slice(0, 5);
+    form.items.push(emptyRow());
+};
+
+const removeItemRow = (index: number): void => {
+    if (form.items.length <= 1) {
+        return;
+    }
+
+    form.items.splice(index, 1);
 };
 
 const normalizeToString = (value: string | number | null | undefined): string => {
@@ -105,7 +124,7 @@ const parseQuantityNumber = (value: string | number | null | undefined): number 
     return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const calculateLineAmount = (quantity: string, unitPrice: string): number => {
+const calculateLineAmount = (quantity: string | number, unitPrice: string): number => {
     return parseQuantityNumber(quantity) * parseCurrencyNumber(unitPrice);
 };
 
@@ -155,6 +174,12 @@ const submit = (): void => {
     <Head :title="`Sua hoa don #${bill.id}`" />
 
     <div class="mx-auto max-w-5xl space-y-8 p-4 md:p-8">
+        <div v-if="invoiceGenerationQueued"
+            class="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-50">
+            Da xep hang tao lai file PDF va anh JPG. Neu ban dung hang doi (database/redis), hay chay worker
+            <code class="rounded bg-background/80 px-1 py-0.5 font-mono text-xs">php artisan queue:work</code>.
+            Khi xu ly xong, lam moi trang de thay lien ket tai lieu.
+        </div>
         <div
             class="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -238,9 +263,10 @@ const submit = (): void => {
             </section>
 
             <section class="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Chi tiet (5 dong)</h2>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Chi tiet hang (toi da 5
+                    dong, khop mau PDF)</h2>
                 <div class="mt-4 overflow-x-auto rounded-xl border border-border">
-                    <table class="w-full min-w-[720px] text-sm">
+                    <table class="w-full min-w-[760px] text-sm">
                         <thead class="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                             <tr>
                                 <th class="px-3 py-2 font-medium">STT</th>
@@ -249,6 +275,7 @@ const submit = (): void => {
                                 <th class="w-24 px-3 py-2 font-medium">SL</th>
                                 <th class="w-32 px-3 py-2 font-medium">Don gia</th>
                                 <th class="w-32 px-3 py-2 font-medium">Thanh tien</th>
+                                <th class="w-24 px-3 py-2 font-medium text-right"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -276,9 +303,23 @@ const submit = (): void => {
                                     <input v-model="form.items[idx].amount"
                                         class="w-full rounded border border-input bg-muted/50 px-2 py-1.5" readonly />
                                 </td>
+                                <td class="px-2 py-1.5 text-right">
+                                    <button v-if="form.items.length > 1" type="button"
+                                        class="rounded border border-border px-2 py-1 text-xs hover:bg-muted/80"
+                                        @click="removeItemRow(idx)">
+                                        Xoa dong
+                                    </button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button"
+                        class="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted/80 disabled:opacity-50"
+                        :disabled="form.items.length >= MAX_ITEM_ROWS" @click="addItemRow">
+                        Them dong
+                    </button>
                 </div>
                 <p v-if="form.errors.items" class="mt-2 text-sm text-destructive">{{ form.errors.items }}</p>
             </section>
