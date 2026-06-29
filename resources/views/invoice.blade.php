@@ -429,29 +429,29 @@
                     <span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[4]->quantity }} </span>
                 </div>
-                <div class="pdf24_01" style="left:24.6482em;top:18.4626em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:23.6482em;top:18.4626em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[0]->unit_price }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:18.4626em;">
+                <div class="pdf24_01" style="left:29.8279em;top:18.4626em;">
                     <span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[0]->amount }} &nbsp;</span>
                 </div>
-                <div class="pdf24_01" style="left:24.6482em;top:20.2114em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:23.6482em;top:20.2114em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[1]->unit_price }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:24.6482em;top:21.9603em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:23.6482em;top:21.9603em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[2]->unit_price }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:24.6482em;top:23.7091em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:23.6482em;top:23.7091em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[3]->unit_price }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:24.6482em;top:25.4579em;"><span
+                <div class="pdf24_01" style="left:23.6482em;top:25.4579em;"><span
                         class="pdf24_17 pdf24_08 pdf24_09">{{ $lineItems[4]->unit_price }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:20.2114em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:29.8279em;top:20.2114em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[1]->amount }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:21.9603em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:29.8279em;top:21.9603em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[2]->amount }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:23.7091em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:29.8279em;top:23.7091em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[3]->amount }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:25.4579em;"><span class="pdf24_17 pdf24_08 pdf24_09">
+                <div class="pdf24_01" style="left:29.8279em;top:25.4579em;"><span class="pdf24_17 pdf24_08 pdf24_09">
                         {{ $lineItems[4]->amount }} &nbsp;</span></div>
-                <div class="pdf24_01" style="left:30.8279em;top:27.2068em;"><span
+                <div class="pdf24_01" style="left:29.8279em;top:27.2068em;"><span
                         class="pdf24_17 pdf24_08 pdf24_09">{{ $bill->bill_total_currency }} &nbsp;</span></div>
                 <div class="pdf24_01" style="left:17.9587em;top:27.2068em;"><span class="pdf24_17 pdf24_08 pdf24_09"
                         style="word-spacing:0.0002em;">Tổng tiền thanh toán </span><span

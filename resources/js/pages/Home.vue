@@ -3,7 +3,8 @@ import axios from 'axios';
 import { Head } from '@inertiajs/vue3';
 import { pdf } from '@/routes/public-bill';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { DownloadIcon, FileIcon, PrinterIcon } from 'lucide-vue-next';
+import PdfPreview from '@/components/PdfPreview.vue';
+import { PrinterIcon } from 'lucide-vue-next';
 
 const props = defineProps<{
     lookup: { bill_sell_mst?: string; bill_private_key?: string } | null;
@@ -107,15 +108,19 @@ onBeforeUnmount(() => {
 
     <div class="min-h-screen bg-[#f3f3f3] text-[#333]">
         <!-- Header -->
-        <header class="h-[56px] bg-white border-b border-gray-200 flex items-center px-6">
-            <div class="flex items-center gap-6">
+        <header class="flex h-14 items-center border-b border-gray-200 bg-white px-4 sm:px-6">
+            <div class="flex items-center gap-3 sm:gap-6">
                 <!-- Logo -->
-                <div class="flex items-center gap-2">
-                    <img src="/invoice_logo.png" alt="logo" class="w-full h-10">
+                <div class="flex shrink-0 items-center gap-2">
+                    <img src="/invoice_logo.png" alt="logo" class="h-8 w-auto max-w-[160px] sm:h-10 sm:max-w-none">
                 </div>
 
                 <!-- Menu -->
-                <button class="w-10 h-10 flex items-center justify-center text-[#6b7a90] hover:bg-gray-100 rounded">
+                <button
+                    class="flex h-10 w-10 items-center justify-center rounded text-[#6b7a90] hover:bg-gray-100 lg:hidden"
+                    type="button"
+                    aria-label="Menu"
+                >
                     ☰
                 </button>
             </div>
@@ -123,12 +128,12 @@ onBeforeUnmount(() => {
 
         <div class="flex">
             <!-- Sidebar -->
-            <aside class="w-[265px] min-h-[calc(100vh-56px)] bg-[#3d4c68]" />
+            <aside class="hidden min-h-[calc(100vh-3.5rem)] w-[265px] shrink-0 bg-[#3d4c68] lg:block" />
 
             <!-- Content -->
-            <main class="flex-1 p-7">
+            <main class="min-w-0 flex-1 p-4 sm:p-6 lg:p-7">
                 <!-- Breadcrumb -->
-                <div class="flex items-center gap-3 text-[13px] text-gray-500 mb-5">
+                <div class="mb-4 flex flex-wrap items-center gap-2 text-xs text-gray-500 sm:mb-5 sm:gap-3 sm:text-[13px]">
                     <span>TIỆN ÍCH</span>
                     <span>›</span>
 
@@ -138,29 +143,30 @@ onBeforeUnmount(() => {
                 <!-- Card -->
                 <div class="bg-white border border-gray-200">
                     <!-- Card Header -->
-                    <div class="h-[52px] border-b border-gray-200 px-4 flex items-center justify-between">
-                        <h2 class="font-semibold text-[14px] text-gray-700">
+                    <div class="flex min-h-[52px] items-center justify-between border-b border-gray-200 px-4">
+                        <h2 class="text-sm font-semibold text-gray-700 sm:text-[14px]">
                             THÔNG TIN TÌM KIẾM
                         </h2>
 
-                        <button class="text-gray-500 text-lg">⌄</button>
+                        <button class="text-lg text-gray-500" type="button" aria-label="Thu gon">⌄</button>
                     </div>
 
                     <!-- Card Body -->
-                    <div class="p-8">
+                    <div class="p-4 sm:p-6 lg:p-8">
                         <!-- Row -->
-                        <div class="grid grid-cols-2 gap-7">
+                        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-7">
                             <!-- MST -->
-                            <div class="lg:grid grid-cols-12  gap-2">
+                            <div class="grid grid-cols-1 gap-2 lg:grid-cols-12">
                                 <label
-                                    class="block text-[14px] font-semibold mb-2 whitespace-nowrap col-span-4 text-end">
+                                    class="block text-sm font-semibold text-gray-700 lg:col-span-4 lg:text-end lg:text-[14px]"
+                                >
                                     MST bên bán
                                     <span class="text-red-500">*</span>
                                 </label>
 
-                                <div class=" col-span-8">
+                                <div class="lg:col-span-8">
                                     <input v-model="form.bill_sell_mst" type="text"
-                                        class="w-full h-[34px] rounded-sm px-3 outline-none focus:ring-0" :class="displayError('bill_sell_mst')
+                                        class="h-[34px] w-full rounded-sm px-3 outline-none focus:ring-0" :class="displayError('bill_sell_mst')
                                             ? 'border border-red-500'
                                             : 'border border-gray-300 focus:border-blue-400'
                                             " @blur="markTouched('bill_sell_mst')" />
@@ -172,16 +178,17 @@ onBeforeUnmount(() => {
                             </div>
 
                             <!-- Password -->
-                            <div class="lg:grid grid-cols-12  gap-2">
+                            <div class="grid grid-cols-1 gap-2 lg:grid-cols-12">
                                 <label
-                                    class="block text-[14px] font-semibold mb-2 whitespace-nowrap col-span-4 text-end">
+                                    class="block text-sm font-semibold text-gray-700 lg:col-span-4 lg:text-end lg:text-[14px]"
+                                >
                                     Mã số bí mật
                                     <span class="text-red-500">*</span>
                                 </label>
 
-                                <div class=" col-span-8">
+                                <div class="lg:col-span-8">
                                     <input v-model="form.bill_private_key" type="text"
-                                        class="w-full h-[34px] rounded-sm px-3 outline-none" :class="displayError('bill_private_key')
+                                        class="h-[34px] w-full rounded-sm px-3 outline-none" :class="displayError('bill_private_key')
                                             ? 'border border-red-500'
                                             : 'border border-gray-300 focus:border-blue-400'
                                             " @blur="markTouched('bill_private_key')" />
@@ -198,9 +205,9 @@ onBeforeUnmount(() => {
                         </div>
 
                         <!-- Submit -->
-                        <div class="mt-7 flex justify-center">
+                        <div class="mt-6 flex justify-center sm:mt-7">
                             <button type="button"
-                                class="h-[34px] px-5 rounded bg-red-600 hover:bg-red-700 text-white text-[14px] font-medium flex items-center gap-2 disabled:opacity-60"
+                                class="flex h-[34px] items-center gap-2 rounded bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 sm:text-[14px]"
                                 :disabled="isLoading" @click="submit">
                                 <span class="text-[16px]">🔎</span>
                                 <span>{{ isLoading ? 'Dang tim...' : 'Tìm kiếm' }}</span>
@@ -209,45 +216,34 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div v-if="pdfPreviewUrl" class="mt-6 overflow-hidden rounded border border-gray-200 bg-white">
-                    <div class="flex items-center justify-center gap-4 text-sm py-5">
-                        <ul class="flex items-center justify-center gap-4 text-red-500 underline font-bold">
-                            <li class=" flex items-center gap-2">
-                                Tải về file PDF
-                            </li>
-                            <li class=" flex items-center gap-2">
-                                Tải về file ZIp
-                            </li>
-                            <li class=" flex items-center gap-2">
-                                Tải chứng thư số
-                            </li>
+                <div v-if="pdfPreviewUrl" class="mt-4 overflow-hidden rounded border border-gray-200 bg-white sm:mt-6">
+                    <div class="flex flex-col items-center gap-3 px-3 py-4 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4 sm:px-4 sm:py-5">
+                        <ul class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs font-bold text-red-500 underline sm:gap-4 sm:text-sm">
+                            <li>Tải về file PDF</li>
+                            <li>Tải về file ZIp</li>
+                            <li>Tải chứng thư số</li>
                         </ul>
                         <button
-                            class="bg-red-600 px-2 py-1 flex items-center justify-center gap-2 text-white rounded font-bold text-lg">
-                            <PrinterIcon class="w-4 h-4" />
+                            type="button"
+                            class="flex shrink-0 items-center justify-center gap-2 rounded bg-red-600 px-3 py-1.5 text-base font-bold text-white sm:text-lg"
+                        >
+                            <PrinterIcon class="h-4 w-4" />
                             <span>In</span>
                         </button>
                     </div>
-                    <object :data="pdfPreviewUrl" type="application/pdf" class="h-[760px] w-full">
-                        <div class="p-4 text-sm text-gray-600">
-                            Trinh duyet khong ho tro xem PDF truc tiep.
-                            <a :href="pdfPreviewUrl" target="_blank" rel="noopener noreferrer"
-                                class="text-blue-600 underline">
-                                Bam vao day de mo file.
-                            </a>
-                        </div>
-                    </object>
+                    <PdfPreview v-if="pdfPreviewUrl" :src="pdfPreviewUrl" />
                 </div>
 
                 <!-- Footer -->
                 <footer
-                    class="mt-72 border-t border-gray-300 pt-6 flex items-center justify-between text-[12px] text-gray-500">
+                    class="mt-12 flex flex-col items-center gap-2 border-t border-gray-300 pt-6 text-center text-[11px] text-gray-500 sm:mt-24 sm:flex-row sm:items-center sm:justify-between sm:text-left sm:text-[12px] lg:mt-48"
+                >
                     <div>
                         ©2016-2026 Bản quyền thuộc về Tập đoàn Công nghiệp - Viễn thông
                         Quân đội Viettel
                     </div>
 
-                    <div>Hóa đơn điện tử SInvoice</div>
+                    <div class="shrink-0">Hóa đơn điện tử SInvoice</div>
                 </footer>
             </main>
         </div>
