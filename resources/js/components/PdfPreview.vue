@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
+import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 import { nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
+
+type DiagnosticStep = {
+    step: string;
+    status: 'ok' | 'error';
+    message?: string;
+};
 
 const props = withDefaults(
     defineProps<{
@@ -16,20 +22,71 @@ const containerRef = useTemplateRef<HTMLDivElement>('containerRef');
 
 const isLoading = ref(false);
 const error = ref<string | null>(null);
+const errorDetail = ref<string | null>(null);
+const diagnosticSteps = ref<DiagnosticStep[]>([]);
 const containerWidth = ref(0);
 
 let pdfjsInitialized = false;
+let pdfWorker: Worker | null = null;
 let currentDoc: PDFDocumentProxy | null = null;
 let renderToken = 0;
 let activeRenderTasks: RenderTask[] = [];
 let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 
-const ensurePdfjs = async (): Promise<typeof import('pdfjs-dist')> => {
+const formatError = (failure: unknown): string => {
+    if (failure instanceof Error) {
+        return failure.message;
+    }
+
+    return String(failure);
+};
+
+const recordStep = (step: string, status: 'ok' | 'error', message?: string): void => {
+    diagnosticSteps.value.push({ step, status, message });
+};
+
+type PdfJsModule = typeof import('pdfjs-dist');
+
+const ensureMapPolyfill = (): void => {
+    const mapPrototype = Map.prototype as typeof Map.prototype & {
+        getOrInsertComputed?: (key: unknown, callback: () => unknown) => unknown;
+    };
+
+    if (typeof mapPrototype.getOrInsertComputed === 'function') {
+        return;
+    }
+
+    mapPrototype.getOrInsertComputed = function (key: unknown, callback: () => unknown): unknown {
+        if (this.has(key)) {
+            return this.get(key);
+        }
+
+        const value = callback();
+        this.set(key, value);
+
+        return value;
+    };
+};
+
+const ensurePdfjs = async (): Promise<PdfJsModule> => {
+    ensureMapPolyfill();
+
     const pdfjs = await import('pdfjs-dist');
 
     if (!pdfjsInitialized) {
-        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
-        pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
+        try {
+            const WorkerConstructor = (await import('pdfjs-dist/build/pdf.worker.min.mjs?worker')).default;
+            pdfWorker = new WorkerConstructor();
+            pdfjs.GlobalWorkerOptions.workerPort = pdfWorker;
+            recordStep('worker', 'ok', 'workerPort (bundled)');
+        } catch {
+            const workerModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+
+            pdfjs.GlobalWorkerOptions.workerSrc =
+                typeof workerModule.default === 'string' ? workerModule.default : String(workerModule.default);
+            recordStep('worker', 'ok', pdfjs.GlobalWorkerOptions.workerSrc);
+        }
+
         pdfjsInitialized = true;
     }
 
@@ -61,23 +118,55 @@ const destroyPdf = (): void => {
     clearCanvases();
 
     if (currentDoc) {
-        void currentDoc.destroy();
+        void currentDoc.cleanup();
         currentDoc = null;
     }
 };
 
-const computePageScale = (page: PDFPageProxy, width: number): number => {
-    const baseViewport = page.getViewport({ scale: 1 });
-    const fitScale = width / baseViewport.width;
+const computePageScale = (pageWidth: number, width: number): number => {
+    const fitScale = width / pageWidth;
 
     return fitScale * (props.scale / 1.5);
 };
 
 const loadPdf = async (src: string): Promise<PDFDocumentProxy> => {
     const { getDocument } = await ensurePdfjs();
-    const loadingTask = getDocument({ url: src });
 
-    return loadingTask.promise;
+    if (src.startsWith('blob:')) {
+        recordStep('source', 'ok', 'blob');
+
+        const response = await fetch(src);
+
+        if (!response.ok) {
+            throw new Error(`Blob fetch failed: HTTP ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        const data = await response.arrayBuffer();
+
+        if (data.byteLength === 0) {
+            throw new Error('Blob fetch returned empty data.');
+        }
+
+        if (contentType && !contentType.toLowerCase().includes('application/pdf')) {
+            throw new Error(`Unexpected content-type: ${contentType}`);
+        }
+
+        recordStep('load', 'ok', `${data.byteLength} bytes`);
+
+        const pdf = await getDocument({ data }).promise;
+        recordStep('parse', 'ok', `${pdf.numPages} page(s)`);
+
+        return pdf;
+    }
+
+    recordStep('source', 'ok', 'url');
+
+    const pdf = await getDocument({ url: src }).promise;
+    recordStep('load', 'ok', src.slice(0, 120));
+    recordStep('parse', 'ok', `${pdf.numPages} page(s)`);
+
+    return pdf;
 };
 
 const renderPage = async (
@@ -99,7 +188,8 @@ const renderPage = async (
         throw new Error('Canvas context unavailable');
     }
 
-    const pageScale = computePageScale(page, width);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const pageScale = computePageScale(baseViewport.width, width);
     const devicePixelRatio = window.devicePixelRatio || 1;
     const viewport = page.getViewport({ scale: pageScale * devicePixelRatio });
 
@@ -126,7 +216,7 @@ const renderAllPages = async (pdf: PDFDocumentProxy, width: number, token: numbe
     const container = containerRef.value;
 
     if (!container) {
-        return;
+        throw new Error('Canvas container is not available.');
     }
 
     clearCanvases();
@@ -142,6 +232,8 @@ const renderAllPages = async (pdf: PDFDocumentProxy, width: number, token: numbe
 
         await renderPage(pdf, pageNumber, canvas, width, token);
     }
+
+    recordStep('render', 'ok', `${pdf.numPages} page(s)`);
 };
 
 const renderPdf = async (src: string, width: number): Promise<void> => {
@@ -149,13 +241,15 @@ const renderPdf = async (src: string, width: number): Promise<void> => {
 
     isLoading.value = true;
     error.value = null;
+    errorDetail.value = null;
+    diagnosticSteps.value = [];
     destroyPdf();
 
     try {
         const pdf = await loadPdf(src);
 
         if (token !== renderToken) {
-            void pdf.destroy();
+            void pdf.cleanup();
 
             return;
         }
@@ -169,13 +263,17 @@ const renderPdf = async (src: string, width: number): Promise<void> => {
         const renderWidth = containerRef.value?.clientWidth ?? width;
 
         if (renderWidth <= 0) {
-            return;
+            throw new Error('Container width is 0px.');
         }
 
         await renderAllPages(pdf, renderWidth, token);
-    } catch {
+    } catch (failure) {
         if (token === renderToken) {
+            const message = formatError(failure);
+
+            recordStep('error', 'error', message);
             error.value = 'Khong the doc file PDF.';
+            errorDetail.value = message;
         }
     } finally {
         if (token === renderToken) {
@@ -240,6 +338,9 @@ onBeforeUnmount(() => {
     clearTimeout(resizeTimer);
     window.removeEventListener('resize', onResize);
     destroyPdf();
+    pdfWorker?.terminate();
+    pdfWorker = null;
+    pdfjsInitialized = false;
 });
 </script>
 
@@ -251,7 +352,15 @@ onBeforeUnmount(() => {
 
         <div v-else-if="error" class="p-4 text-sm text-gray-600">
             {{ error }}
-            <a :href="src" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">
+            <p v-if="errorDetail" class="mt-2 rounded bg-red-50 p-2 font-mono text-xs text-red-700">
+                {{ errorDetail }}
+            </p>
+            <ul v-if="diagnosticSteps.length" class="mt-2 space-y-1 rounded bg-amber-50 p-2 font-mono text-xs text-amber-950">
+                <li v-for="(item, index) in diagnosticSteps" :key="index">
+                    {{ item.step }}: {{ item.status }}<span v-if="item.message"> — {{ item.message }}</span>
+                </li>
+            </ul>
+            <a :href="src" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-blue-600 underline">
                 Bam vao day de mo file PDF.
             </a>
         </div>
