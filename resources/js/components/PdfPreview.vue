@@ -1,90 +1,181 @@
 <script setup lang="ts">
-import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { useElementSize } from '@vueuse/core';
-import { onBeforeUnmount, ref, watch } from 'vue';
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
+import { nextTick, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
 
-GlobalWorkerOptions.workerSrc = pdfjsWorker;
+const props = withDefaults(
+    defineProps<{
+        src: string;
+        scale?: number;
+    }>(),
+    {
+        scale: 1.5,
+    },
+);
 
-const props = defineProps<{
-    src: string;
-}>();
-
-const containerRef = ref<HTMLElement | null>(null);
-const { width: containerWidth } = useElementSize(containerRef);
+const containerRef = useTemplateRef<HTMLDivElement>('containerRef');
 
 const isLoading = ref(false);
 const error = ref<string | null>(null);
-const pageImages = ref<string[]>([]);
+const containerWidth = ref(0);
 
+let pdfjsInitialized = false;
 let currentDoc: PDFDocumentProxy | null = null;
 let renderToken = 0;
+let activeRenderTasks: RenderTask[] = [];
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
 
-const destroyCurrentDoc = (): void => {
+const ensurePdfjs = async (): Promise<typeof import('pdfjs-dist')> => {
+    const pdfjs = await import('pdfjs-dist');
+
+    if (!pdfjsInitialized) {
+        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker.default;
+        pdfjsInitialized = true;
+    }
+
+    return pdfjs;
+};
+
+const updateContainerWidth = (): void => {
+    const width = containerRef.value?.clientWidth ?? 0;
+
+    if (width > 0) {
+        containerWidth.value = width;
+    }
+};
+
+const cancelActiveRenders = (): void => {
+    for (const task of activeRenderTasks) {
+        task.cancel();
+    }
+
+    activeRenderTasks = [];
+};
+
+const clearCanvases = (): void => {
+    containerRef.value?.replaceChildren();
+};
+
+const destroyPdf = (): void => {
+    cancelActiveRenders();
+    clearCanvases();
+
     if (currentDoc) {
-        void currentDoc.cleanup();
+        void currentDoc.destroy();
         currentDoc = null;
+    }
+};
+
+const computePageScale = (page: PDFPageProxy, width: number): number => {
+    const baseViewport = page.getViewport({ scale: 1 });
+    const fitScale = width / baseViewport.width;
+
+    return fitScale * (props.scale / 1.5);
+};
+
+const loadPdf = async (src: string): Promise<PDFDocumentProxy> => {
+    const { getDocument } = await ensurePdfjs();
+    const loadingTask = getDocument({ url: src });
+
+    return loadingTask.promise;
+};
+
+const renderPage = async (
+    pdf: PDFDocumentProxy,
+    pageNumber: number,
+    canvas: HTMLCanvasElement,
+    width: number,
+    token: number,
+): Promise<void> => {
+    const page = await pdf.getPage(pageNumber);
+
+    if (token !== renderToken) {
+        return;
+    }
+
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+        throw new Error('Canvas context unavailable');
+    }
+
+    const pageScale = computePageScale(page, width);
+    const devicePixelRatio = window.devicePixelRatio || 1;
+    const viewport = page.getViewport({ scale: pageScale * devicePixelRatio });
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+
+    const renderTask = page.render({
+        canvas,
+        viewport,
+    });
+
+    activeRenderTasks.push(renderTask);
+
+    try {
+        await renderTask.promise;
+    } finally {
+        activeRenderTasks = activeRenderTasks.filter((task) => task !== renderTask);
+    }
+};
+
+const renderAllPages = async (pdf: PDFDocumentProxy, width: number, token: number): Promise<void> => {
+    const container = containerRef.value;
+
+    if (!container) {
+        return;
+    }
+
+    clearCanvases();
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        if (token !== renderToken) {
+            return;
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'block w-full h-auto';
+        container.appendChild(canvas);
+
+        await renderPage(pdf, pageNumber, canvas, width, token);
     }
 };
 
 const renderPdf = async (src: string, width: number): Promise<void> => {
     const token = ++renderToken;
+
     isLoading.value = true;
     error.value = null;
-    pageImages.value = [];
+    destroyPdf();
 
     try {
-        const loadingTask = getDocument({ url: src });
-        const pdf = await loadingTask.promise;
+        const pdf = await loadPdf(src);
 
         if (token !== renderToken) {
-            void pdf.cleanup();
+            void pdf.destroy();
 
             return;
         }
 
-        destroyCurrentDoc();
         currentDoc = pdf;
+        isLoading.value = false;
 
-        const images: string[] = [];
-        const dpr = window.devicePixelRatio || 1;
-        const targetWidth = width * dpr;
+        await nextTick();
+        updateContainerWidth();
 
-        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
+        const renderWidth = containerRef.value?.clientWidth ?? width;
 
-            if (token !== renderToken) {
-                return;
-            }
-
-            const baseViewport = page.getViewport({ scale: 1 });
-            const scale = targetWidth / baseViewport.width;
-            const viewport = page.getViewport({ scale });
-
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-
-            const context = canvas.getContext('2d');
-
-            if (!context) {
-                throw new Error('Canvas context unavailable');
-            }
-
-            await page.render({
-                canvas,
-                viewport,
-            }).promise;
-
-            images.push(canvas.toDataURL('image/png'));
+        if (renderWidth <= 0) {
+            return;
         }
 
-        if (token === renderToken) {
-            pageImages.value = images;
-        }
+        await renderAllPages(pdf, renderWidth, token);
     } catch {
         if (token === renderToken) {
-            error.value = 'Khong the hien thi file PDF.';
+            error.value = 'Khong the doc file PDF.';
         }
     } finally {
         if (token === renderToken) {
@@ -93,28 +184,69 @@ const renderPdf = async (src: string, width: number): Promise<void> => {
     }
 };
 
-watch(
-    [() => props.src, containerWidth],
-    ([src, width]) => {
-        if (!src || width <= 0) {
-            return;
-        }
+const scheduleRender = (): void => {
+    if (import.meta.env.SSR || !props.src) {
+        return;
+    }
 
-        renderPdf(src, width);
-    },
-    { immediate: true },
+    updateContainerWidth();
+
+    const width = containerWidth.value || containerRef.value?.clientWidth || 0;
+
+    if (width <= 0) {
+        return;
+    }
+
+    void renderPdf(props.src, width);
+};
+
+const onResize = (): void => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(updateContainerWidth, 150);
+};
+
+watch(
+    () => props.src,
+    () => scheduleRender(),
 );
+
+watch(
+    () => props.scale,
+    () => {
+        if (currentDoc && containerWidth.value > 0) {
+            void renderAllPages(currentDoc, containerWidth.value, renderToken);
+        }
+    },
+);
+
+watch(containerWidth, (width, previousWidth) => {
+    if (width <= 0 || !currentDoc || isLoading.value) {
+        return;
+    }
+
+    if (previousWidth <= 0 || Math.abs(width - previousWidth) > 8) {
+        void renderAllPages(currentDoc, width, renderToken);
+    }
+});
+
+onMounted(() => {
+    updateContainerWidth();
+    window.addEventListener('resize', onResize);
+    scheduleRender();
+});
 
 onBeforeUnmount(() => {
     renderToken++;
-    destroyCurrentDoc();
+    clearTimeout(resizeTimer);
+    window.removeEventListener('resize', onResize);
+    destroyPdf();
 });
 </script>
 
 <template>
-    <div ref="containerRef" class="w-full">
+    <div class="w-full">
         <div v-if="isLoading" class="flex items-center justify-center py-16 text-sm text-gray-500">
-            Dang tai hoa don...
+            Dang tai PDF...
         </div>
 
         <div v-else-if="error" class="p-4 text-sm text-gray-600">
@@ -124,14 +256,6 @@ onBeforeUnmount(() => {
             </a>
         </div>
 
-        <div v-else class="flex flex-col">
-            <img
-                v-for="(image, index) in pageImages"
-                :key="index"
-                :src="image"
-                alt=""
-                class="block w-full h-auto"
-            />
-        </div>
+        <div v-show="!isLoading && !error" ref="containerRef" class="flex w-full flex-col" />
     </div>
 </template>
